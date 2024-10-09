@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CampusCatalyst</title>
+  <!-- Include any required CSS files here -->
+  <link rel="stylesheet" href="{% static 'path/to/your/css/styles.css' %}">
+</head>
+<body>
+  <!-- Include navigation here if needed -->
+  {% include 'user_navigation.html' %}
+
+  {% if messages %}
+    <div class="container mt-3">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  
+  <div class="container">
+    {% block body %}
+    {% endblock %}
+  </div>
+
+  
+  {% include 'footer.html' %}
+  
+  
+  <script src="{% static 'path/to/your/js/scripts.js' %}"></script>
+</body>
+</html>

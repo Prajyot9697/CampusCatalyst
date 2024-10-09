@@ -1,0 +1,691 @@
+from django.shortcuts import render,HttpResponse
+from datetime import date
+from .models import *
+from django.contrib.auth.models import User
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login, logout
+import razorpay
+from django.conf import settings
+from django.core.mail import send_mail
+import random
+from django.contrib import messages
+
+def index(request):
+    return render(request, 'index.html')
+
+def change_passwordadmin(request):
+    if not request.user.is_authenticated:
+        return redirect('admin_login')
+    error = ""
+    if request.method == "POST":
+        c = request.POST['currentpassword']
+        n = request.POST['newpassword']
+        try:
+            u = User.objects.get(id=request.user.id)
+            if u.check_password(c):
+                u.set_password(n)
+                u.save()
+                error = "no"
+            else:
+                error = "not"
+        except:
+            error = "yes"
+    d = {'error': error}
+    return render(request, 'change_passwordadmin.html', d)
+
+
+def change_passwordrecruiter(request):
+    if not request.user.is_authenticated:
+        return redirect('recruiter_login')
+    error = ""
+    if request.method == "POST":
+        c = request.POST['currentpassword']
+        n = request.POST['newpassword']
+        try:
+            u = User.objects.get(id=request.user.id)
+            if u.check_password(c):
+                u.set_password(n)
+                u.save()
+                error = "no"
+            else:
+                error = "not"
+        except:
+            error = "yes"
+    d = {'error': error}
+    return render(request, 'change_passwordrecruiter.html',d)
+
+
+def change_passworduser(request):
+    if not request.user.is_authenticated:
+        return redirect('user_login')
+    error = ""
+    if request.method == "POST":
+        c = request.POST['currentpassword']
+        n = request.POST['newpassword']
+        try:
+            u = User.objects.get(id=request.user.id)
+            if u.check_password(c):
+                u.set_password(n)
+                u.save()
+                error = "no"
+            else:
+                error = "not"
+        except:
+            error = "yes"
+    d = {'error': error}
+    return render(request, 'change_passworduser.html', d)
+
+
+def add_job(request):
+    # if not request.user.is_authenticated:
+    #     return redirect('recruiter_login')
+    error = ""
+    recruiter = Recruiter.objects.get(user=request.user)
+    if not recruiter.has_paid:
+        return redirect('/makepayment')
+    if request.method == "POST":
+        jt = request.POST['jobtitle']
+        sd = request.POST['startdate']
+        ed = request.POST['enddate']
+        sal = request.POST['salary']
+        l = request.FILES['logo']
+        exp = request.POST['experience']
+        loc = request.POST['location']
+        skills = request.POST['skills']
+        des = request.POST['description']
+        user = request.user
+        recruiter = Recruiter.objects.get(user=user)
+        try:
+            Job.objects.create(recruiter=recruiter, start_date=sd, end_date=ed, title=jt, salary=sal, image=l,
+                               description=des, experience=exp, location=loc, skills=skills, creationdate=date.today())
+            error = "no"
+        except:
+            error = "yes"
+    d = {'error': error}
+    return render(request, 'add_job.html', d)
+
+def edit_job(request,pid):
+    if not request.user.is_authenticated:
+        return redirect('recruiter_login')
+    error = ""
+    job = Job.objects.get(id=pid)
+    if request.method == "POST":
+        jt = request.POST['jobtitle']
+        sd = request.POST['startdate']
+        ed = request.POST['enddate']
+        sal = request.POST['salary']
+        exp = request.POST['experience']
+        loc = request.POST['location']
+        skills = request.POST['skills']
+        des = request.POST['description']
+
+        job.title = jt
+        job.salary = sal
+        job.experience = exp
+        job.location = loc
+        job.skills = skills
+        job.description = des
+        try:
+            job.save()
+            error = "no"
+        except:
+            error = "yes"
+        if sd:
+            try:
+                job.start_date=sd
+                job.save()
+            except:
+                pass
+        else:
+            pass
+
+        if ed:
+            try:
+                job.end_date=ed
+                job.save()
+            except:
+                pass
+        else:
+            pass
+    d = {'error': error, 'job':job}
+    return render(request, 'edit_jobdetails.html', d)
+
+def delete_job(request,pid):
+    if not request.user.is_authenticated:
+        return redirect('recruiter_login')
+    job = Job.objects.get(id=pid)
+    job.delete()
+    return redirect('job_list')
+
+def change_companylogo(request,pid):
+    if not request.user.is_authenticated:
+        return redirect('recruiter_login')
+    error = ""
+    job = Job.objects.get(id=pid)
+    if request.method == "POST":
+        cl = request.FILES['logo']
+        job.image = cl
+        try:
+            job.save()
+            error = "no"
+        except:
+            error = "yes"
+    d = {'error': error, 'job':job}
+    return render(request, 'change_companylogo.html', d)
+
+
+def job_list(request):
+    if not request.user.is_authenticated:
+        return redirect('recruiter_login')
+    user = request.user
+    recruiter = Recruiter.objects.get(user=user)
+    job = Job.objects.filter(recruiter=recruiter)
+    d = {'job': job}
+    return render(request, 'job_list.html', d)
+
+
+def delete_user(request, pid):
+    if not request.user.is_authenticated:
+        return redirect('admin_login')
+    student = User.objects.get(id=pid)
+    student.delete()
+    return redirect('view_users')
+
+
+def delete_recruiter(request, pid):
+    if not request.user.is_authenticated:
+        return redirect('admin_login')
+    recruiter = User.objects.filter(id=pid)
+    recruiter.delete()
+    return redirect('/view_recruiters')
+
+
+def view_users(request):
+    if not request.user.is_authenticated:
+        return redirect('admin_login')
+    data = StudentUser.objects.all()
+    d = {'data': data}
+    return render(request, 'view_users.html', d)
+
+
+def view_recruiters(request):
+    if not request.user.is_authenticated:
+        return redirect('admin_login')
+    data = Recruiter.objects.all()
+    d = {'data': data}
+    return render(request, 'view_recruiters.html', d)
+
+
+def recruiter_pending(request):
+    if not request.user.is_authenticated:
+        return redirect('admin_login')
+    data = Recruiter.objects.filter(status='pending')
+    d = {'data': data}
+    return render(request, 'recruiter_pending.html', d)
+
+
+def recruiter_accept(request):
+    if not request.user.is_authenticated:
+        return redirect('admin_login')
+    data = Recruiter.objects.filter(status='Accept')
+    d = {'data': data}
+    return render(request, 'recruiter_accept.html', d)
+
+
+def recruiter_reject(request):
+    if not request.user.is_authenticated:
+        return redirect('admin_login')
+    data = Recruiter.objects.filter(status='Reject')
+    d = {'data': data}
+    return render(request, 'recruiter_reject.html', d)
+
+
+def admin_login(request):
+    error = ""
+    if request.method == 'POST':
+        u = request.POST['uname']
+        p = request.POST['pwd']
+        user = authenticate(username=u, password=p)
+        try:
+            if user.is_staff:
+                login(request, user)
+                error = "no"
+            else:
+                error = "yes"
+        except:
+            error = "yes"
+    d = {'error': error}
+    return render(request, 'admin_login.html', d)
+
+
+def user_login(request):
+    error = ""
+    if request.method == 'POST':
+        u = request.POST['uname']
+        p = request.POST['pwd']
+        user = authenticate(username=u, password=p)
+        if user:
+            try:
+                user1 = StudentUser.objects.get(user=user)
+                if user1.type == "student":
+                    login(request, user)
+                    error = "no"
+                else:
+                    error = "yes"
+            except:
+                error = "yes"
+        else:
+            error = "yes"
+    d = {'error': error}
+    return render(request, 'user_login.html', d)
+
+
+def recruiter_login(request):
+    error = ""
+    if request.method == 'POST':
+        u = request.POST['uname']
+        p = request.POST['pwd']
+        user = authenticate(username=u, password=p)
+        if user:
+            try:
+                user1 = Recruiter.objects.get(user=user)
+
+                if user1.type == "recruiter":
+                    if user1.status == "pending":
+                        error = "not"  # Login status is pending
+                    elif user1.status == "Reject":
+                        error = "nor"  # Login status is rejected
+                    else:
+                        login(request, user)
+                        error = "no"  # Successful login
+                else:
+                    error = "yes"  # Invalid recruiter type
+
+            except Recruiter.DoesNotExist:
+                error = "yes"  # Recruiter not found
+
+        else:
+            error = "yes"  # Invalid login credentials
+
+    d = {'error': error}
+    return render(request, 'recruiter_login.html', d)
+    #     if user:
+    #         try:
+    #             user1 = Recruiter.objects.get(user=user)
+    #             if user1.type == "recruiter" and user1.status != "pending" :
+    #                 login(request, user)
+    #                 error = "no"
+    #             else:
+    #                 error = "not"
+
+    #             if user1.type == "recruiter" and user1.status != "Reject" :
+    #                 error="no"
+    #             else:
+    #                 error = "nor"
+    #         except:
+    #             error = "yes"
+    #     else:
+    #         error = "yes"
+    # d = {'error': error}
+    # return render(request, 'recruiter_login.html', d)
+
+
+def recruiter_signup(request):
+    error = ""
+    if request.method == 'POST':
+        f = request.POST['fname']
+        l = request.POST['lname']
+        i = request.FILES['image']
+        p = request.POST['pwd']
+        e = request.POST['email']
+        com = request.POST['company']
+        con = request.POST['contact']
+        gen = request.POST['gender']
+        try:
+            user = User.objects.create_user(first_name=f, last_name=l, username=e, password=p)
+            Recruiter.objects.create(user=user, mobile=con, image=i, gender=gen, company=com, type="recruiter",
+                                     status="pending")
+            error = "no"
+        except:
+            error = "yes"
+    d = {'error': error}
+    return render(request, 'recruiter_signup.html', d)
+
+
+def change_status(request, pid):
+    if not request.user.is_authenticated:
+        return redirect('admin_login')
+    error = ""
+    recruiter = Recruiter.objects.get(id=pid)
+    if request.method == "POST":
+        s = request.POST['status']
+        recruiter.status = s
+        try:
+            recruiter.save()
+            error = "no"
+        except:
+            error = "yes"
+    d = {'recruiter': recruiter, 'error': error}
+
+    return render(request, 'change_status.html', d)
+
+
+def user_home(request):
+    if not request.user.is_authenticated:
+        return redirect('user_login')
+    user = request.user
+    student = StudentUser.objects.get(user=user)
+    error = ""
+    if request.method == 'POST':
+        f = request.POST['fname']
+        l = request.POST['lname']
+        con = request.POST['contact']
+        gen = request.POST['gender']
+
+        student.user.first_name = f
+        student.user.last_name = l
+        student.mobile = con
+        student.gender = gen
+
+        try:
+            student.save()
+            student.user.save()
+            error = "no"
+        except:
+            error = "yes"
+
+        try:
+            i = request.FILES['image']
+            student.image = i
+            student.save()
+            error = "no"
+        except:
+            pass
+    d = {'student': student, 'error': error}
+    return render(request, 'user_home.html',d)
+
+
+def recruiter_home(request):
+    if not request.user.is_authenticated:
+        return redirect('recruiter_login')
+    user = request.user
+    recruiter = Recruiter.objects.get(user=user)
+    error = ""
+    if request.method == 'POST':
+        f = request.POST['fname']
+        l = request.POST['lname']
+        con = request.POST['contact']
+        gen = request.POST['gender']
+
+        recruiter.user.first_name =f
+        recruiter.user.last_name = l
+        recruiter.mobile = con
+        recruiter.gender = gen
+        try:
+            recruiter.save()
+            recruiter.user.save()
+            error = "no"
+        except:
+            error = "yes"
+
+        try:
+            i = request.FILES['image']
+            recruiter.image = i
+            recruiter.save()
+            error = "no"
+        except:
+            pass
+    d = {'recruiter': recruiter, 'error': error}
+
+    return render(request, 'recruiter_home.html',d)
+
+
+def admin_home(request):
+    if not request.user.is_authenticated:
+        return redirect('admin_login')
+    rcount = Recruiter.objects.all().count()
+    scount = StudentUser.objects.all().count()
+    d = {'rcount':rcount,'scount':scount}
+    return render(request, 'admin_home.html',d)
+
+
+def Logout(request):
+    logout(request)
+    return redirect('index')
+
+
+def user_signup(request):
+    error = ""
+    if request.method == 'POST':
+        f = request.POST['fname']
+        l = request.POST['lname']
+        i = request.FILES['image']
+        p = request.POST['pwd']
+        e = request.POST['email']
+        con = request.POST['contact']
+        gen = request.POST['gender']
+        try:
+            user = User.objects.create_user(first_name=f, last_name=l, username=e, password=p)
+            StudentUser.objects.create(user=user, mobile=con, image=i, gender=gen, type="student")
+            error = "no"
+        except:
+            error = "yes"
+    d = {'error': error}
+    return render(request, 'user_signup.html', d)
+
+
+def latest_jobs(request):
+    job = Job.objects.all().order_by('-start_date')
+    d = {'job': job}
+    return render(request, 'latest_jobs.html', d)
+
+def admin_job(request):
+    job = Job.objects.all().order_by('-start_date')
+    d = {'job': job}
+    return render(request, 'admin_job.html', d)
+
+def user_joblist(request):
+    job = Job.objects.all().order_by('-start_date')
+    user = request.user
+    student = StudentUser.objects.get(user=user)
+    data = ApplyJob.objects.filter(student=student)
+    li=[]
+    for i in data:
+        li.append(i.job.id)
+    d = {'job': job, 'li':li}
+    return render(request, 'user_joblist.html', d)
+
+def job_detail(request, pid):
+    job = Job.objects.get(id=pid)
+    d = {'job': job}
+    return render(request, 'job_detail.html', d)
+
+def admin_job_detail(request, pid):
+    job = Job.objects.get(id=pid)
+    d = {'job': job}
+    return render(request, 'admin_job_detail.html', d)
+
+def applied_candidatelist(request):
+    if not request.user.is_authenticated:
+        return redirect('recruiter_login')
+    data = ApplyJob.objects.all()
+    d = {'data': data}
+    return render(request, 'applied_candidatelist.html',d)
+
+# def applyforjob(request, pid):
+#     if not request.user.is_authenticated:
+#         return redirect('user_login')
+#     error=""
+#     user = request.user
+#     student = StudentUser.objects.get(user=user)
+#     job = Job.objects.get(id=pid)
+#     date1 = date.today()
+#     if job.end_date <date1:
+#         error = "close"
+#     elif job.start_date > date1:
+#         error = "notopen"
+#     else:
+#         if request.method == 'POST':
+#             cl = request.FILES['resume']
+#             ApplyJob.objects.create(job=job, student=student,resume=cl,applydate=date.today())
+#             error= "done"
+
+#     d = {'error':error}
+#     return render(request, 'applyforjob.html', d)
+
+def applyforjob(request, pid):
+    if not request.user.is_authenticated:
+        return redirect('user_login')
+    
+    error = ""
+    user = request.user
+    student = StudentUser.objects.get(user=user)
+    job = Job.objects.get(id=pid)
+    date1 = date.today()
+    
+    if job.end_date < date1:
+        error = "close"
+    elif job.start_date > date1:
+        error = "notopen"
+    else:
+        if request.method == 'POST':
+            cl = request.FILES['resume']
+            ApplyJob.objects.create(job=job, student=student, resume=cl, applydate=date.today())
+            error = "done"
+            r = Recruiter.objects.get(id=job.recruiter.id)
+            # Send email to the user
+            subject = f"Application for {job.title} at {r.company}"
+            message = f"Dear {user.first_name},\n\nThank you for applying for the {job.title} position at {r.company}. We have received your application and will review it shortly.\n\nBest regards,\n{r.company}"
+            from_email = settings.EMAIL_HOST_USER
+            recipient_list = [user.username]
+
+            try:
+                send_mail(subject, message, from_email, recipient_list, fail_silently=False)
+            except Exception as e:
+                print(f"Error sending email: {e}")
+
+    d = {'error': error}
+    return render(request, 'applyforjob.html', d)
+
+
+def contact(request):
+    return render(request,'contact.html')
+
+def student_ticket(request):
+    if not request.user.is_authenticated:
+        return redirect('user_login')
+    error = ""
+    if request.method == 'POST':
+        t = request.POST['title']
+        s = request.POST['subject']
+        d = request.POST['description']
+        try:
+            user = User.objects.get(id=request.user.id)
+            Ticket.objects.create(title=t, subject=s, description=d, user=user, created_at=date.today())
+            error = "no"
+        except:
+            error = "yes"
+    d = {'error': error}
+    return render(request,'student_ticket.html',d)
+
+def recruiter_ticket(request):
+    if not request.user.is_authenticated:
+        return redirect('recruiter_login')
+    error = ""
+    if request.method == 'POST':
+        t = request.POST['title']
+        s = request.POST['subject']
+        d = request.POST['description']
+        try:
+            user = User.objects.get(id=request.user.id)
+            Ticket.objects.create(title=t, subject=s, description=d, user=user, created_at=date.today())
+            error = "no"
+        except:
+            error = "yes"
+    d = {'error': error}
+    return render(request,'recruiter_ticket.html',d)
+
+def ticket_list(request):
+    if not request.user.is_authenticated:
+        return redirect('admin_login')
+    data = Ticket.objects.all()
+    d = {'data': data}
+    return render(request,'ticket_list.html',d)
+
+def feedback_list(request):
+    if not request.user.is_authenticated:
+        return redirect('admin_login')
+    data = Feedback.objects.all()
+    d = {'data': data}
+    return render(request,'feedback_list.html',d)
+
+def recruiter_feedback(request):
+    if not request.user.is_authenticated:
+        return redirect('recruiter_login')
+    error = ""
+    if request.method == 'POST':
+        t = request.POST['title']
+        s = request.POST['rating']
+        d = request.POST['feedback']
+        try:
+            user = User.objects.get(id=request.user.id)
+            Feedback.objects.create(user=user, title=t, rating=s, feedback=d, created_at=date.today())
+            error = "no"
+        except:
+            error = "yes"
+    d = {'error': error}
+    return render(request,'recruiter_feedback.html',d)
+
+def student_feedback(request):
+    if not request.user.is_authenticated:
+        return redirect('user_login')
+    error = ""
+    if request.method == 'POST':
+        t = request.POST['title']
+        s = request.POST['rating']
+        d = request.POST['feedback']
+        try:
+            user = User.objects.get(id=request.user.id)
+            Feedback.objects.create(user=user, title=t, rating=s, feedback=d, created_at=date.today())
+            error = "no"
+        except:
+            error = "yes"
+    d = {'error': error}
+    return render(request,'student_feedback.html',d)
+
+def makepayment(request):
+
+    client = razorpay.Client(auth=("rzp_test_XZo7om8m3825jB", "14OCfWTfZditzntOf5sVc2aE"))
+
+    amt=500
+    recruiter=User.objects.filter(id=request.user.id)
+
+
+    data = { "amount": amt*100, "currency": "INR", "receipt": "order_rcptid_11" }
+    payment = client.order.create(data=data)
+    context={}
+    context['payment']=payment
+    context['recruiter']=recruiter
+
+    # print(payment)
+    return render(request,'payment.html',context)
+
+def paymentsuccess(request):
+             recruiter = Recruiter.objects.get(user=request.user)
+             recruiter.has_paid = True
+             recruiter.save()
+
+             return redirect('/add_job')
+
+
+def test_email(request):
+    subject = 'Test Email'
+    message = 'This is a test email.'
+    from_email = settings.EMAIL_HOST_USER
+    recipient_list = ['prajyotthorat96@gmail.com']
+
+    try:
+        send_mail(subject, message, from_email, recipient_list, fail_silently=False)
+        return HttpResponse("Email sent successfully.")
+    except Exception as e:
+        return HttpResponse(f"Error sending email: {e}")
